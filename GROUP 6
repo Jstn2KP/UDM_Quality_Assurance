@@ -1,0 +1,2543 @@
+visitor form source code: 
+
+!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>UDM Visitor Pass</title>
+    <link rel="stylesheet" href="https://unpkg.com/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/bs-brain@2.0.4/components/logins/login-6/assets/css/login-6.css">
+    <link rel="stylesheet" type="text/css" href="css/style.css">
+</head>
+<body>
+    <!-- Visitor Pass Form -->
+    <section class="p-3 p-md-4 p-xl-5">
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="login-container">
+                    <div class="card border-0 shadow-sm rounded-4">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-12">
+                                    <div class="mb-3">
+                                        <h3>Visitor Pass Form</h3>
+                                    </div>
+                                </div>
+                            </div>
+                            <form method="POST" action="connection.php">
+                                <div class="row gy-3">
+                                    <!-- First Column -->
+                                    <div class="col-md-6">
+                                        <div class="form-floating mb-3">
+                                            <input type="text" class="form-control" name="fname" required>
+                                            <label for="fname" class="form-label">First Name:</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-floating mb-3">
+                                            <input type="text" class="form-control" name="mname" required>
+                                            <label for="mname" class="form-label">Middle Name:</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-floating mb-3">
+                                            <input type="text" class="form-control" name="lname" required>
+                                            <label for="lname" class="form-label">Last Name:</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-floating mb-3">
+                                            <select name="department" class="form-control" id="department-select" required onchange="updateDateTimePicker()">
+                                                <option value="" selected hidden>Select Department</option>
+                                                <option value="OSA">Office of Student Affairs</option>
+                                                <option value="Registrar">Registrar</option>
+                                                <option value="College of Engineering technology">College of Engineering Technology</option>
+                                                <option value="College Business Administration">College Business Administration</option>
+                                            </select>
+                                            <label for="department" class="form-label">Department to Visit:</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-floating mb-3">
+                                            <input type="text" class="form-control" name="purpose" required>
+                                            <label for="purpose" class="form-label">Purpose to Visit:</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-floating mb-3">
+                                            <input type="datetime-local" class="form-control" name="dtime" required>
+                                            <label for="dtime" class="form-label">Date & Time to Visit:</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="form-floating mb-3">
+                                            <input type="email" class="form-control" name="email" required pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$">
+                                            <label for="email" class="form-label">Email:</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="d-grid">
+                                            <button type="submit" name="submit" class="btn btn-small btn-primary">Submit</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    
+
+
+</body>
+</html>
+
+feedback form src code:
+
+<?php
+session_start();
+
+// Database credentials
+$servername = "localhost";
+$username = "root";
+$password = "";
+$dbname = "data";
+
+// Create connection
+$conn = new mysqli($servername, $username, $password, $dbname);
+
+// Check connection
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
+
+// Initialize variables
+$email = '';
+$errorMessage = '';
+$showFeedbackForm = false;
+$visitorData = [
+    'fname' => '',
+    'lname' => '',
+    'department' => ''
+];
+$confirmationMessage = $_SESSION['confirmation_message'] ?? '';
+
+// Clear session confirmation message
+unset($_SESSION['confirmation_message']);
+
+// Check if the email is submitted
+if (isset($_POST['check_email'])) {
+    $email = trim($_POST['email']);
+
+    // Check if the email exists in the visitor table
+    $stmt = $conn->prepare("SELECT fname, lname, department FROM visitor WHERE email = ?");
+    $stmt->bind_param("s", $email);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    if ($result->num_rows > 0) {
+        // Check if the email already submitted feedback
+        $stmtFeedback = $conn->prepare("SELECT id FROM feedback WHERE email = ?");
+        $stmtFeedback->bind_param("s", $email);
+        $stmtFeedback->execute();
+        $feedbackResult = $stmtFeedback->get_result();
+
+        if ($feedbackResult->num_rows > 0) {
+            // Email already submitted feedback
+            $errorMessage = "This email has already submitted feedback!";
+        } else {
+            // Email found in visitor table and hasn't submitted feedback yet
+            $visitorData = $result->fetch_assoc();
+            $showFeedbackForm = true;
+            $_SESSION['email'] = $email;
+        }
+
+        $stmtFeedback->close();
+    } else {
+        // Email not found
+        $errorMessage = "Email not found. Please check your email.";
+    }
+
+    $stmt->close();
+}
+
+// Handle feedback form submission
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_feedback'])) {
+    $email = $_SESSION['email'] ?? ''; // Use email from session
+
+    // Check feedback option
+    $feedbackOption = $_POST['feedback_option'] ?? '';
+    $feedbackProvided = ($feedbackOption === 'yes');
+
+    // Set questions to NULL if feedback is not provided
+    $question1 = $feedbackProvided ? ($_POST['question1'] ?? NULL) : NULL;
+    $question2 = $feedbackProvided ? ($_POST['question2'] ?? NULL) : NULL;
+    $question3 = $feedbackProvided ? ($_POST['question3'] ?? NULL) : NULL;
+    $question4 = $feedbackProvided ? ($_POST['question4'] ?? NULL) : NULL;
+    $question5 = $feedbackProvided ? ($_POST['question5'] ?? NULL) : NULL;
+    $question6 = $feedbackProvided ? ($_POST['question6'] ?? NULL) : NULL;
+    $question7 = $feedbackProvided ? ($_POST['question7'] ?? NULL) : NULL;
+    $question8 = $feedbackProvided ? ($_POST['question8'] ?? NULL) : NULL;
+    $question9 = $feedbackProvided ? ($_POST['question9'] ?? NULL) : NULL;
+    $question10 = $feedbackProvided ? ($_POST['question10'] ?? NULL) : NULL;
+
+    // Retrieve visitor details
+    $fname = $_POST['fname'];
+    $lname = $_POST['lname'];
+    $department = $_POST['department'];
+
+    // Retrieve suggestion
+    $suggestion = $feedbackProvided ? ($_POST['suggestion'] ?? NULL) : NULL;
+    $person = $feedbackProvided ? ($_POST['person'] ?? NULL) : NULL;
+
+    // Insert feedback into the database
+    $stmt = $conn->prepare("
+        INSERT INTO feedback (email, fname, lname, department, question1, question2, question3, question4, question5, question6, question7, question8, question9, question10, suggestion, person) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ");
+    $stmt->bind_param("ssssssssssssssss", $email, $fname, $lname, $department, $question1, $question2, $question3, $question4, $question5, $question6, $question7, $question8, $question9, $question10, $suggestion, $person);
+
+    if ($stmt->execute()) {
+        if (!$feedbackProvided) {
+            $_SESSION['confirmation_message'] = "Thank you for confirming your details. No feedback was submitted.";
+        } else {
+            $_SESSION['confirmation_message'] = "Thank you for your feedback! Please see this into guard!! Have a nice day!!";
+        }
+
+        // Redirect to avoid form resubmission
+        header("Location: feedbackform.php");
+        exit();
+    } else {
+        error_log("Insert error: " . $stmt->error); // Log error for debugging
+        $errorMessage = "There was an error submitting your feedback. Please try again.";
+    }
+
+    $stmt->close();
+}
+
+// Close the connection
+$conn->close();
+?>
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Verification and Feedback Form</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" type="text/css" href="css/style1.css">
+</head>
+<body>
+    <div class="container my-5">
+        <div class="login-container">
+            <div class="card-body">
+                <?php if ($confirmationMessage): ?>
+                    <p class="text-success"><?php echo $confirmationMessage; ?></p>
+                <?php elseif (!$showFeedbackForm): ?>
+                    <!-- Email Verification Form -->
+                    <h3>Verifying Email</h3>
+                    <form action="" method="post">
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Enter your email:</label>
+                            <input type="email" id="email" name="email" class="form-control" required>
+                        </div>
+                        <button type="submit" name="check_email" class="btn-small">Verify Email</button>
+                    </form>
+                    <?php if ($errorMessage): ?>
+                        <p class="text-danger"><?php echo $errorMessage; ?></p>
+                    <?php endif; ?>
+                <?php else: ?>
+                    <!-- Feedback Form -->
+                    <form action="" method="post">
+    <!-- Visitor Information -->
+    <div class="container mt-4">
+        <div class="card shadow-lg p-4">
+            <h3 class="text-center mb-4">Visitor Information</h3>
+            <div class="mb-3">
+                <label for="fname" class="form-label">First Name:</label>
+                <input type="text" id="fname" name="fname" class="form-control" value="<?php echo htmlspecialchars($visitorData['fname']); ?>" readonly>
+            </div>
+            <div class="mb-3">
+                <label for="lname" class="form-label">Last Name:</label>
+                <input type="text" id="lname" name="lname" class="form-control" value="<?php echo htmlspecialchars($visitorData['lname']); ?>" readonly>
+            </div>
+            <div class="mb-3">
+                <label for="department" class="form-label">Department:</label>
+                <input type="text" id="department" name="department" class="form-control" value="<?php echo htmlspecialchars($visitorData['department']); ?>" readonly>
+            </div>
+        </div>
+
+        <!-- Feedback Question -->
+        <div class="mt-4">
+            <h5>Would you like to provide feedback?</h5>
+            <div class="form-check form-check-inline">
+                <input type="radio" class="form-check-input" name="feedback_option" value="yes" required>
+                <label class="form-check-label">Yes</label>
+            </div>
+            <div class="form-check form-check-inline">
+                <input type="radio" class="form-check-input" name="feedback_option" value="no">
+                <label class="form-check-label">No</label>
+            </div>
+        </div>
+
+        <!-- Feedback Fields (Hidden by Default) -->
+        <div id="feedback_fields" style="display:none;">
+            <div class="card shadow-lg mt-4 p-4">
+                <h3 class="text-center mb-4">Feedback</h3>
+                <p class="text-muted text-center mb-3">(SA – Strongly Agree, A – Agree, MA – Moderately Agree, D – Disagree, SD – Strongly Disagree)</p>
+
+                <!-- Question 1 -->
+                <div class="mb-3">
+                    <label>The staff were courteous and professional:</label>
+                    <div class="btn-group d-flex justify-content-center" role="group">
+                        <input type="radio" class="btn-check" name="question1" id="q1-sa" value="SA" required>
+                        <label class="btn btn-outline-primary" for="q1-sa">SA</label>
+                        <input type="radio" class="btn-check" name="question1" id="q1-a" value="A">
+                        <label class="btn btn-outline-primary" for="q1-a">A</label>
+                        <input type="radio" class="btn-check" name="question1" id="q1-ma" value="MA">
+                        <label class="btn btn-outline-primary" for="q1-ma">MA</label>
+                        <input type="radio" class="btn-check" name="question1" id="q1-d" value="D">
+                        <label class="btn btn-outline-primary" for="q1-d">D</label>
+                        <input type="radio" class="btn-check" name="question1" id="q1-sd" value="SD">
+                        <label class="btn btn-outline-primary" for="q1-sd">SD</label>
+                    </div>
+                </div>
+
+                <!-- Question 2 -->
+                <div class="mb-3">
+                    <label>The services provided were efficient and met my expectations:</label>
+                    <div class="btn-group d-flex justify-content-center" role="group">
+                        <input type="radio" class="btn-check" name="question2" id="q2-sa" value="SA" required>
+                        <label class="btn btn-outline-primary" for="q2-sa">SA</label>
+                        <input type="radio" class="btn-check" name="question2" id="q2-a" value="A">
+                        <label class="btn btn-outline-primary" for="q2-a">A</label>
+                        <input type="radio" class="btn-check" name="question2" id="q2-ma" value="MA">
+                        <label class="btn btn-outline-primary" for="q2-ma">MA</label>
+                        <input type="radio" class="btn-check" name="question2" id="q2-d" value="D">
+                        <label class="btn btn-outline-primary" for="q2-d">D</label>
+                        <input type="radio" class="btn-check" name="question2" id="q2-sd" value="SD">
+                        <label class="btn btn-outline-primary" for="q2-sd">SD</label>
+                    </div>
+                </div>
+
+                <!-- Question 3 -->
+                <div class="mb-3">
+                    <label>I would recommend this service to others:</label>
+                    <div class="btn-group d-flex justify-content-center" role="group">
+                        <input type="radio" class="btn-check" name="question3" id="q3-sa" value="SA" required>
+                        <label class="btn btn-outline-primary" for="q3-sa">SA</label>
+                        <input type="radio" class="btn-check" name="question3" id="q3-a" value="A">
+                        <label class="btn btn-outline-primary" for="q3-a">A</label>
+                        <input type="radio" class="btn-check" name="question3" id="q3-ma" value="MA">
+                        <label class="btn btn-outline-primary" for="q3-ma">MA</label>
+                        <input type="radio" class="btn-check" name="question3" id="q3-d" value="D">
+                        <label class="btn btn-outline-primary" for="q3-d">D</label>
+                        <input type="radio" class="btn-check" name="question3" id="q3-sd" value="SD">
+                        <label class="btn btn-outline-primary" for="q3-sd">SD</label>
+                    </div>
+                </div>
+
+                <!-- Question 4 -->
+                <div class="mb-3">
+                    <label>Overall, I am satisfied with my experience:</label>
+                    <div class="btn-group d-flex justify-content-center" role="group">
+                        <input type="radio" class="btn-check" name="question4" id="q4-sa" value="SA" required>
+                        <label class="btn btn-outline-primary" for="q4-sa">SA</label>
+                        <input type="radio" class="btn-check" name="question4" id="q4-a" value="A">
+                        <label class="btn btn-outline-primary" for="q4-a">A</label>
+                        <input type="radio" class="btn-check" name="question4" id="q4-ma" value="MA">
+                        <label class="btn btn-outline-primary" for="q4-ma">MA</label>
+                        <input type="radio" class="btn-check" name="question4" id="q4-d" value="D">
+                        <label class="btn btn-outline-primary" for="q4-d">D</label>
+                        <input type="radio" class="btn-check" name="question4" id="q4-sd" value="SD">
+                        <label class="btn btn-outline-primary" for="q4-sd">SD</label>
+                    </div>
+                </div>
+
+                <!-- Question 5 -->
+                <div class="mb-3">
+                    <label>The staff provided clear and helpful information:</label>
+                    <div class="btn-group d-flex justify-content-center" role="group">
+                        <input type="radio" class="btn-check" name="question5" id="q5-sa" value="SA" required>
+                        <label class="btn btn-outline-primary" for="q5-sa">SA</label>
+                        <input type="radio" class="btn-check" name="question5" id="q5-a" value="A">
+                        <label class="btn btn-outline-primary" for="q5-a">A</label>
+                        <input type="radio" class="btn-check" name="question5" id="q5-ma" value="MA">
+                        <label class="btn btn-outline-primary" for="q5-ma">MA</label>
+                        <input type="radio" class="btn-check" name="question5" id="q5-d" value="D">
+                        <label class="btn btn-outline-primary" for="q5-d">D</label>
+                        <input type="radio" class="btn-check" name="question5" id="q5-sd" value="SD">
+                        <label class="btn btn-outline-primary" for="q5-sd">SD</label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                            <label>The waiting time was reasonable:</label><br>
+                            <div class="btn-group d-flex justify-content-center" role="group" aria-label="Feedback for overall satisfaction">
+                                <input type="radio" class="btn-check" name="question6" id="q6-sa" value="SA" required>
+                                <label class="btn btn-outline-primary" for="q6-sa">SA</label>
+                                <input type="radio" class="btn-check" name="question6" id="q6-a" value="A">
+                                <label class="btn btn-outline-primary" for="q6-a">A</label>
+                                <input type="radio" class="btn-check" name="question6" id="q6-ma" value="MA">
+                                <label class="btn btn-outline-primary" for="q6-ma">MA</label>
+                                <input type="radio" class="btn-check" name="question6" id="q6-d" value="D">
+                                <label class="btn btn-outline-primary" for="q6-d">D</label>
+                                <input type="radio" class="btn-check" name="question6" id="q6-sd" value="SD">
+                                <label class="btn btn-outline-primary" for="q6-sd">SD</label>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label>The overall process was organized and smooth:</label><br>
+                            <div class="btn-group d-flex justify-content-center" role="group" aria-label="Feedback for overall satisfaction">
+                                <input type="radio" class="btn-check" name="question7" id="q7-sa" value="SA" required>
+                                <label class="btn btn-outline-primary" for="q7-sa">SA</label>
+                                <input type="radio" class="btn-check" name="question7" id="q7-a" value="A">
+                                <label class="btn btn-outline-primary" for="q7-a">A</label>
+                                <input type="radio" class="btn-check" name="question7" id="q7-ma" value="MA">
+                                <label class="btn btn-outline-primary" for="q7-ma">MA</label>
+                                <input type="radio" class="btn-check" name="question7" id="q7-d" value="D">
+                                <label class="btn btn-outline-primary" for="q7-d">D</label>
+                                <input type="radio" class="btn-check" name="question7" id="q7-sd" value="SD">
+                                <label class="btn btn-outline-primary" for="q7-sd">SD</label>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label>The physical environment was comfortable and conducive to providing services:</label><br>
+                            <div class="btn-group d-flex justify-content-center" role="group" aria-label="Feedback for overall satisfaction">
+                                <input type="radio" class="btn-check" name="question8" id="q8-sa" value="SA" required>
+                                <label class="btn btn-outline-primary" for="q8-sa">SA</label>
+                                <input type="radio" class="btn-check" name="question8" id="q8-a" value="A">
+                                <label class="btn btn-outline-primary" for="q8-a">A</label>
+                                <input type="radio" class="btn-check" name="question8" id="q8-ma" value="MA">
+                                <label class="btn btn-outline-primary" for="q8-ma">MA</label>
+                                <input type="radio" class="btn-check" name="question8" id="q8-d" value="D">
+                                <label class="btn btn-outline-primary" for="q8-d">D</label>
+                                <input type="radio" class="btn-check" name="question8" id="q8-sd" value="SD">
+                                <label class="btn btn-outline-primary" for="q8-sd">SD</label>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label>here were sufficient resources (e.g., forms, staff availability) to address my needs:</label><br>
+                            <div class="btn-group d-flex justify-content-center" role="group" aria-label="Feedback for overall satisfaction">
+                                <input type="radio" class="btn-check" name="question9" id="q9-sa" value="SA" required>
+                                <label class="btn btn-outline-primary" for="q9-sa">SA</label>
+                                <input type="radio" class="btn-check" name="question9" id="q9-a" value="A">
+                                <label class="btn btn-outline-primary" for="q9-a">A</label>
+                                <input type="radio" class="btn-check" name="question9" id="q9-ma" value="MA">
+                                <label class="btn btn-outline-primary" for="q9-ma">MA</label>
+                                <input type="radio" class="btn-check" name="question9" id="q9-d" value="SD">
+                                <label class="btn btn-outline-primary" for="q9-d">D</label>
+                                <input type="radio" class="btn-check" name="question9" id="q9-sd" value="SD">
+                                <label class="btn btn-outline-primary" for="q9-sd">SD</label>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label>I am satisfied with the overall experience:</label><br>
+                            <div class="btn-group d-flex justify-content-center" role="group" aria-label="Feedback for overall satisfaction">
+                                <input type="radio" class="btn-check" name="question10" id="q10-sa" value="SA" required>
+                                <label class="btn btn-outline-primary" for="q10-sa">SA</label>
+                                <input type="radio" class="btn-check" name="question10" id="q10-a" value="A">
+                                <label class="btn btn-outline-primary" for="q10-a">A</label>
+                                <input type="radio" class="btn-check" name="question10" id="q10-ma" value="MA">
+                                <label class="btn btn-outline-primary" for="q10-ma">MA</label>
+                                <input type="radio" class="btn-check" name="question10" id="q10-d" value="D">
+                                <label class="btn btn-outline-primary" for="q10-d">D</label>
+                                <input type="radio" class="btn-check" name="question10" id="q10-sd" value="SD">
+                                <label class="btn btn-outline-primary" for="q10-sd">SD</label>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+    <label for="person" class="form-label">Person Visited (optional):</label>
+    <textarea id="person" name="person" class="form-control" rows="2" placeholder="Please share your suggestions..."></textarea>
+</div>
+
+                        <!-- Suggestion Field -->
+<div class="mb-3">
+    <label for="suggestion" class="form-label">Suggestions (optional):</label>
+    <textarea id="suggestion" name="suggestion" class="form-control" rows="3" placeholder="Please share your suggestions..."></textarea>
+</div>
+
+            </div>
+        </div>
+
+        <!-- Submit Button -->
+        <div class="mt-4 text-center">
+            <button type="submit" name="submit_feedback" class="btn btn-primary btn-lg">Submit Feedback</button>
+        </div>
+    </div>
+</form>
+
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+
+    <script src="script1.js"></script>
+</body>
+</html>
+
+Login.html source code
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Login</title>
+    <link rel="stylesheet" href="https://unpkg.com/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/bs-brain@2.0.4/components/logins/login-6/assets/css/login-6.css">
+    <style>
+    /* Full-screen background */
+    body, html {
+        height: 100%;
+        margin: 0;
+    }
+
+    section {
+        background: url('img/udm.jpg') no-repeat center center fixed; /* Use the image as the background */
+        background-size: cover; /* Ensure the image covers the entire background */
+        min-height: 100vh; /* Ensure the section covers the full screen */
+    }
+
+    .login-container {
+        max-width: 350px; /* Set a smaller max-width for the form */
+        width: 100%; /* Allow it to take up full width on smaller screens */
+        margin: auto; /* Center the form horizontally */
+        padding: 20px; /* Add some padding for better aesthetics */
+    }
+
+    .card-body {
+        padding: 1.5rem; /* Reduce padding for a smaller form */
+    }
+
+    /* Style for smaller text and button */
+    .btn-small {
+        font-size: 0.85rem; /* Smaller font size for the button */
+        padding: 0.4rem 0.8rem; /* Reduce padding for a smaller button */
+        width: auto; /* Ensure the width is automatic */
+    }
+
+    h3 {
+        font-size: 1.25rem; /* Reduce the font size of the header */
+    }
+
+    .form-floating label {
+        font-size: 0.875rem; /* Smaller label font size */
+    }
+
+    .form-control {
+        font-size: 0.875rem; /* Smaller input text size */
+        padding: 0.5rem; /* Reduced padding inside input fields */
+    }
+</style>
+
+</head>
+<body>
+    <!-- Login 6 - Bootstrap Brain Component -->
+    <section class="p-3 p-md-4 p-xl-5">
+      <div class="container">
+        <div class="row justify-content-center">
+          <div class="login-container">
+            <div class="card border-0 shadow-sm rounded-4">
+              <div class="card-body">
+                <div class="row">
+                  <div class="col-12">
+                    <div class="mb-3">
+                      <h3 align="center">ADMIN</h3>
+                    </div>
+                  </div>
+                </div>
+                <form method="POST" action="loginprocess.php">
+                  <div class="row gy-3 overflow-hidden">
+                    <div class="col-12">
+                      <div class="form-floating mb-3">
+                        <input type="username" class="form-control" name="username" id="username" value="" placeholder="">
+                        <label for="username" class="form-label">Username:</label>
+                      </div>
+                    </div>
+                    <div class="col-12">
+                      <div class="form-floating mb-3">
+                        <input type="password" class="form-control" name="password" id="password" value="" placeholder="Password" required>
+                        <label for="password" class="form-label">Password:</label>
+                      </div>
+                    </div>
+                    <div class="col-12">
+                      <div class="d-grid">
+                        <button class="btn btn-small bsb-btn-2xl btn-primary" type="submit">Log in</button>
+                      </div>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+</body>
+</html>
+
+index1
+
+<?php
+session_start();
+if (!isset($_SESSION['username'])) {
+    header("Location: login.html");
+    exit;
+}
+?>
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Visitor Information</title>
+    <!-- SB Admin 2 CSS -->
+     <link href="vendor/fontawesome-free/css/all.min.css" rel="stylesheet" type="text/css">
+        <link
+            href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i"
+            rel="stylesheet">
+            <link href="https://cdn.jsdelivr.net/npm/startbootstrap-sb-admin-2@4.1.3/css/sb-admin-2.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/startbootstrap-sb-admin-2@4.1.3/js/sb-admin-2.min.js"></script>
+
+        <!-- Custom styles for this template-->
+        <link href="css/sb-admin-2.min.css" rel="stylesheet">
+      <style>
+
+/* Table Styling */
+.table-container {
+    width: 100%;
+    max-width: 800px;
+    margin: 20px auto;
+    padding: 20px;
+    background-color: #001f3f; /* Dark blue background */
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    color: white;
+}
+
+/* Table Heading Styling */
+.table-container h1 {
+    color: #007bff; /* Bright blue for heading text */
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 20px;
+    animation: fadeInUp 0.8s ease-out;
+}
+
+/* Table Styling */
+.table {
+    background-color: #f4f4f4; /* Light gray table background */
+    border-collapse: separate;
+    border-spacing: 0;
+    width: 100%;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.table th, .table td {
+    padding: 10px;
+    text-align: center;
+    color: #001f3f; /* Dark blue text */
+    font-weight: bold;
+}
+
+.table th {
+    background-color: #0056b3; /* Deep blue for headers */
+    color: white;
+}
+
+.table td {
+    background-color: white;
+}
+
+/* Buttons and Select Styling */
+.btn-primary {
+    background-color: #007bff; /* Blue button */
+    border: none;
+    font-weight: bold;
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #0056b3; /* Darker blue on hover */
+}
+
+select.form-control {
+    border: 2px solid #007bff;
+    color: black;
+    font-weight: bold;
+    background-color: white;
+}
+
+//* Table Row Bounce Animation */
+table tbody tr {
+    opacity: 0;
+    transform: scale(0.5); /* Initial smaller scale */
+    animation: bounceIn 0.6s ease forwards;
+}
+
+table tbody tr:nth-child(even) {
+    animation-delay: 0.1s;
+}
+
+table tbody tr:nth-child(odd) {
+    animation-delay: 0.2s;
+}
+
+/* Bounce In Keyframes */
+@keyframes bounceIn {
+    0% {
+        opacity: 0;
+        transform: scale(0.5); /* Start at smaller size */
+    }
+    70% {
+        transform: scale(1.2); /* Bounce to larger size */
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1); /* Return to original size */
+    }
+}
+</style>
+
+
+
+
+</head>
+
+<body id="page-top">
+
+    <!-- Page Wrapper -->
+    <div id="wrapper">
+
+        <!-- Sidebar -->
+        <ul class="navbar-nav bg-gradient-primary sidebar sidebar-dark accordion" id="accordionSidebar">
+
+            <!-- Sidebar - Brand -->
+            <a class="sidebar-brand d-flex align-items-center justify-content-center" href="index.html">
+                <div class="sidebar-brand-icon rotate-n-15">
+                    <i class="fas fa-laugh-wink"></i>
+                </div>
+                <div class="sidebar-brand-text mx-3">System</div>
+            </a>
+
+            <!-- Divider -->
+            <hr class="sidebar-divider my-0">
+
+            <!-- Nav Item - Dashboard -->
+            <li class="nav-item active">
+                <a class="nav-link" >
+                    <i class="fas fa-fw fa-tachometer-alt"></i>
+                    <span>Dashboard</span></a>
+            </li>
+
+            <!-- Divider -->
+            <hr class="sidebar-divider">
+
+            <li class="nav-item">
+                <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseTwo"
+                    aria-expanded="true" aria-controls="collapseTwo">
+                    <i class="fas fa-fw fa-table"></i>
+                    <span>Feedback Informations</span>
+                </a>
+                <div id="collapseTwo" class="collapse" aria-labelledby="headingTwo" data-parent="#accordionSidebar">
+                    <div class="bg-white py-2 collapse-inner rounded">
+                        <h6 class="collapse-header">Data:</h6>
+                        <a class="collapse-item" href="feedback.php">Informations of Visitor</a>
+                        <a class="collapse-item" href="feedbacks.php">Feedbacks of Visitor</a>
+                        <a class="collapse-item" href="suggestion.php">Suggestions of Visitor</a>
+                    </div>
+                </div>
+            </li>
+
+
+            <!-- Divider -->
+            <hr class="sidebar-divider">
+
+           <li class="nav-item">
+                <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseUtilities"
+                    aria-expanded="true" aria-controls="collapseUtilities">
+                    <i class="fas fa-fw fa-chart-area"></i>
+                    <span>Charts</span>
+                </a>
+                <div id="collapseUtilities" class="collapse" aria-labelledby="headingUtilities"
+                    data-parent="#accordionSidebar">
+                    <div class="bg-white py-2 collapse-inner rounded">
+                        <h6 class="collapse-header">Analytics:</h6>
+                        <a class="collapse-item" href="charts.php">Visitor Charts</a>
+                        <a class="collapse-item" href="visitor.php">Feedback Charts</a>
+                    </div>
+                </div>
+            </li>
+
+
+            <!-- Sidebar Toggler (Sidebar) -->
+            <div class="text-center d-none d-md-inline">
+                <button class="rounded-circle border-0" id="sidebarToggle"></button>
+            </div>
+
+            
+
+        </ul>
+        <!-- End of Sidebar -->
+
+        <!-- Content Wrapper -->
+        <div id="content-wrapper" class="d-flex flex-column">
+
+            <!-- Main Content -->
+            <div id="content">
+
+                <!-- Topbar -->
+                <nav class="navbar navbar-expand navbar-light bg-white topbar mb-4 static-top shadow">
+
+                    <!-- Sidebar Toggle (Topbar) -->
+                    <button id="sidebarToggleTop" class="btn btn-link d-md-none rounded-circle mr-3">
+                        <i class="fa fa-bars"></i>
+                    </button>
+
+
+
+                    <!-- Topbar Navbar -->
+                    <ul class="navbar-nav ml-auto">
+
+
+
+                        
+
+                        <!-- Nav Item - User Information -->
+                        <li class="nav-item dropdown no-arrow">
+                            <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button"
+                                data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                <span class="mr-2 d-none d-lg-inline text-gray-600 small">Admin</span>
+                                <img class="img-profile rounded-circle" src="img/merlion-logo.png">
+                            </a>
+                            <!-- Dropdown - User Information -->
+                            <div class="dropdown-menu dropdown-menu-right shadow animated--grow-in"
+                                aria-labelledby="userDropdown">
+                                
+                                <a class="dropdown-item" href="#" data-toggle="modal" data-target="#logoutModal">
+                                    <i class="fas fa-sign-out-alt fa-sm fa-fw mr-2 text-gray-400"></i>
+                                    Logout
+                                </a>
+                            </div>
+                        </li>
+
+                    </ul>
+
+                </nav>
+                <!-- End of Topbar -->
+
+                <!-- Visitor Information Section -->
+                <div class="container-fluid">
+    <form method="GET" class="mb-3">
+        <table class="table">
+            <tr>
+                <td>
+                    <a href="create.php" class="btn btn-primary"style="font-size: 15px; ">Create Visitor</a>
+                </td>
+                <td>
+                    <select name="department" class="form-control" style="font-size: 15px; width: 300px;" onchange="this.form.submit()">
+                        <option value="">All Departments</option>
+                        <option value="Registrar" <?= (isset($_GET['department']) && $_GET['department'] == 'Registrar') ? 'selected' : '' ?>>Registrar</option>
+                        <option value="OSA" <?= (isset($_GET['department']) && $_GET['department'] == 'OSA') ? 'selected' : '' ?>>Office of Student Affairs</option>
+                        <option value="College Of Engineering Technology" <?= (isset($_GET['department']) && $_GET['department'] == 'College Of Engineering Technology') ? 'selected' : '' ?>>College of Engineering Technology</option>
+                        <option value="College Business Administration" <?= (isset($_GET['department']) && $_GET['department'] == 'College Business Administration') ? 'selected' : '' ?>>College of Business Administration</option>
+                    </select>
+                </td>
+            </tr>
+        </table>
+</form>
+
+</div>
+
+
+                    <!-- Visitor Table -->
+                    <div class="card shadow mb-4">
+                        <div class="card-header py-3">
+                            <h3 class="m-0 font-weight-bold text-primary" align="center" align="center" style="font-size: 25px;">Visitor's List</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                                    <thead>
+                                        <tr>
+                                            <th>Last Name</th>
+                                            <th>Middle Name</th>
+                                            <th>First Name</th>
+                                            <th>Department</th>
+                                            <th>Purpose</th>
+                                            <th>Date and Time</th>
+                                            <th>Email</th>
+                                            <th>Time In</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                        <?php
+    $dbhost = "localhost";
+    $dbuser = "root";
+    $dbpass = "";
+    $db = "data";
+    $conn = new mysqli($dbhost, $dbuser, $dbpass, $db);
+
+    if ($conn->connect_error) {
+        die("Connection failed: " . $conn->connect_error);
+    }
+
+    $selected_department = isset($_GET['department']) ? $_GET['department'] : '';
+    $search_query = isset($_GET['search']) ? $_GET['search'] : '';
+
+    $sql = "SELECT * FROM visitor WHERE 1=1";
+    if ($selected_department) {
+        $sql .= " AND department = '$selected_department'";
+    }
+    if ($search_query) {
+        $search_query = $conn->real_escape_string($search_query);
+        $sql .= " AND lname LIKE '%$search_query%'";
+    }
+
+    $result = $conn->query($sql);
+
+    if (!$result) {
+        die("Invalid query: " . $conn->error);
+    }
+
+    while ($row = $result->fetch_assoc()) {
+        // Format the datetime fields
+        $formatted_dtime = date("F d, Y/H:i", strtotime($row["dtime"]));
+
+        // Check if time_in is NULL, and set it to blank if it is
+        if ($row["time_in"] === NULL) {
+            $formatted_time_in = '';
+        } else {
+            $formatted_time_in = date("F d, Y/H:i", strtotime($row["time_in"]));
+        }
+
+        echo "<tr>
+
+            <td>" . htmlspecialchars(ucwords($row["lname"]), ENT_QUOTES) . "</td>  <!-- fname first -->
+            <td>" . htmlspecialchars(ucwords($row["mname"]), ENT_QUOTES) . "</td>
+            <td>" . htmlspecialchars(ucwords($row["fname"]), ENT_QUOTES) . "</td>
+            <td class='department' data-bs-toggle='tooltip' title='" . htmlspecialchars($row["department"], ENT_QUOTES) . "'>" . htmlspecialchars(ucwords($row["department"]), ENT_QUOTES) . "</td>
+            <td class='purpose' data-bs-toggle='tooltip' title='" . htmlspecialchars($row["purpose"], ENT_QUOTES) . "'>" . htmlspecialchars(ucwords($row["purpose"]), ENT_QUOTES) . "</td>
+            <td class='datetime' data-bs-toggle='tooltip' title='" . htmlspecialchars($row["dtime"], ENT_QUOTES) . "'>" . htmlspecialchars($formatted_dtime, ENT_QUOTES) . "</td>
+            <td class='email'>" . htmlspecialchars(strtolower($row["email"]), ENT_QUOTES) . "</td>
+            <td class='timein' data-bs-toggle='tooltip' title='" . htmlspecialchars($row["time_in"], ENT_QUOTES) . "'>" . htmlspecialchars($formatted_time_in, ENT_QUOTES) . "</td>
+            <td>
+                <div class='btn-group'>
+                    <a class='btn btn-primary btn-sm' href='edit.php?id=" . urlencode($row["id"]) . "'>Edit</a>
+                    <a class='btn btn-danger btn-sm' href='delete.php?id=" . urlencode($row["id"]) . "'>Delete</a>
+                </div>
+            </td>
+        </tr>";
+    }
+?>
+
+
+
+                </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- End of Visitor Information Section -->
+            </div>
+            <!-- End of Main Content -->
+        </div>
+        <!-- End of Content Wrapper -->
+    </div>
+    <!-- End of Page Wrapper -->
+
+    <div class="modal fade" id="logoutModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="exampleModalLabel">Ready to Leave?</h5>
+                    <button class="close" type="button" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">×</span>
+                    </button>
+                </div>
+                <div class="modal-body">Select "Logout" below if you are ready to end your current session.</div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" type="button" data-dismiss="modal">Cancel</button>
+                    <a class="btn btn-primary" href="login.html">Logout</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- SB Admin 2 JS -->
+    <script src="vendor/jquery/jquery.min.js"></script>
+    <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Core plugin JavaScript-->
+    <script src="vendor/jquery-easing/jquery.easing.min.js"></script>
+
+    <!-- Custom scripts for all pages-->
+    <script src="js/sb-admin-2.min.js"></script>
+
+    <!-- Page level plugins -->
+    <script src="vendor/datatables/jquery.dataTables.min.js"></script>
+    <script src="vendor/datatables/dataTables.bootstrap4.min.js"></script>
+
+    <!-- Page level custom scripts -->
+    <script src="js/demo/datatables-demo.js"></script>
+
+</body>
+
+</html>
+    
+charts source code:
+
+<?php
+// Database connection and query logic to get the visitor count data by department and month
+session_start();
+
+// Database credentials
+$servername = "localhost";
+$username = "root";
+$password = "";
+$dbname = "data";
+
+// Create connection
+$conn = new mysqli($servername, $username, $password, $dbname);
+
+// Check connection
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
+$selectedMonth = isset($_POST['month']) ? $_POST['month'] : date('n'); // Default to current month
+// Query to get visitor count by department and selected month
+$sql = "
+    SELECT 
+        department, 
+        COUNT(*) AS visitor_count 
+    FROM visitor 
+    WHERE MONTH(time_in) = $selectedMonth 
+    GROUP BY department
+    ORDER BY department ASC
+";
+$result = $conn->query($sql);
+
+$departments = [];
+$visitorCounts = [];
+$months = range(1, 12); // January to December
+
+// Process the query results into arrays for chart data
+while ($row = $result->fetch_assoc()) {
+    $departments[] = $row['department'];
+    $visitorCounts[] = $row['visitor_count'];
+}
+
+// Query to get the total visitor count
+$sql_total = "
+    SELECT 
+        COUNT(*) AS visitor_count 
+    FROM visitor
+";
+$result_total = $conn->query($sql_total);
+
+// Process the query result for the total visitor count
+$totalVisitorCount = 0;
+if ($row = $result_total->fetch_assoc()) {
+    $totalVisitorCount = $row['visitor_count'];
+}
+
+// Close the database connection
+$conn->close();
+?>
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <title>Visitor Information</title>
+
+    <!-- Custom fonts for this template-->
+        <link href="vendor/fontawesome-free/css/all.min.css" rel="stylesheet" type="text/css">
+    <link
+        href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i"
+        rel="stylesheet">
+        <link href="https://cdn.jsdelivr.net/npm/startbootstrap-sb-admin-2@4.1.3/css/sb-admin-2.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/startbootstrap-sb-admin-2@4.1.3/js/sb-admin-2.min.js"></script>
+
+    <!-- Custom styles for this template-->
+    <link href="css/sb-admin-2.min.css" rel="stylesheet">
+    <link rel="stylesheet" type="text/css" href="css/style4.css">
+    </style> 
+
+</head>
+
+<body id="page-top">
+
+    <!-- Page Wrapper -->
+    <div id="wrapper">
+
+        <!-- Sidebar -->
+        <ul class="navbar-nav bg-gradient-primary sidebar sidebar-dark accordion" id="accordionSidebar">
+
+            <!-- Sidebar - Brand -->
+            <a class="sidebar-brand d-flex align-items-center justify-content-center" href="index.html">
+                <div class="sidebar-brand-icon rotate-n-15">
+                    <i class="fas fa-laugh-wink"></i>
+                </div>
+                <div class="sidebar-brand-text mx-3">System</div>
+            </a>
+
+            <!-- Divider -->
+            <hr class="sidebar-divider my-0">
+
+            <!-- Nav Item - Dashboard -->
+            <li class="nav-item active">
+                <a class="nav-link" href="index1.php">
+                    <i class="fas fa-fw fa-tachometer-alt"></i>
+                    <span>Dashboard</span></a>
+            </li>
+
+            <!-- Divider -->
+            <hr class="sidebar-divider">
+
+            <!-- Nav Item - Pages Collapse Menu -->
+            <li class="nav-item">
+                <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseTwo"
+                    aria-expanded="true" aria-controls="collapseTwo">
+                    <i class="fas fa-fw fa-table"></i>
+                    <span>Feedback Informations</span>
+                </a>
+                <div id="collapseTwo" class="collapse" aria-labelledby="headingTwo" data-parent="#accordionSidebar">
+                    <div class="bg-white py-2 collapse-inner rounded">
+                        <h6 class="collapse-header">Data:</h6>
+                        <a class="collapse-item" href="feedback.php">Informations of Visitor</a>
+                        <a class="collapse-item" href="feedbacks.php">Feedbacks of Visitor</a>
+                        <a class="collapse-item" href="suggestion.php">Suggestions of Visitor</a>
+                    </div>
+                </div>
+            </li>
+
+
+            <!-- Divider -->
+            <hr class="sidebar-divider">
+
+            <!-- Heading -->
+
+            <!-- Nav Item - Pages Collapse Menu -->
+
+            <li class="nav-item">
+                <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseUtilities"
+                    aria-expanded="true" aria-controls="collapseUtilities">
+                    <i class="fas fa-fw fa-chart-area"></i>
+                    <span>Charts</span>
+                </a>
+                <div id="collapseUtilities" class="collapse" aria-labelledby="headingUtilities"
+                    data-parent="#accordionSidebar">
+                    <div class="bg-white py-2 collapse-inner rounded">
+                        <h6 class="collapse-header">Analytics:</h6>
+                        <a class="collapse-item" href="">Visitor Charts</a>
+                        <a class="collapse-item" href="visitor.php">Feedback Charts</a>
+                    </div>
+                </div>
+            </li>
+
+
+            <!-- Sidebar Toggler (Sidebar) -->
+            <div class="text-center d-none d-md-inline">
+                <button class="rounded-circle border-0" id="sidebarToggle"></button>
+            </div>
+            
+
+        </ul>
+        <!-- End of Sidebar -->
+
+        <!-- Content Wrapper -->
+        <div id="content-wrapper" class="d-flex flex-column">
+
+            <!-- Main Content -->
+            <div id="content">
+
+                <!-- Topbar -->
+                <nav class="navbar navbar-expand navbar-light bg-white topbar mb-4 static-top shadow">
+
+                    <!-- Sidebar Toggle (Topbar) -->
+                    <button id="sidebarToggleTop" class="btn btn-link d-md-none rounded-circle mr-3">
+                        <i class="fa fa-bars"></i>
+                    </button>
+
+
+                    <!-- Topbar Navbar -->
+                    <ul class="navbar-nav ml-auto">
+
+                        
+
+                        
+                        
+
+                        <div class="topbar-divider d-none d-sm-block"></div>
+
+                        <!-- Nav Item - User Information -->
+                        <li class="nav-item dropdown no-arrow">
+                            <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button"
+                                data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                <span class="mr-2 d-none d-lg-inline text-gray-600 small">Admin</span>
+                                <img class="img-profile rounded-circle" src="img/merlion-logo.png">
+                            </a>
+                            <!-- Dropdown - User Information -->
+                            <div class="dropdown-menu dropdown-menu-right shadow animated--grow-in"
+                                aria-labelledby="userDropdown">
+                                
+                                <div class="dropdown-divider"></div>
+                                <a class="dropdown-item" href="#" data-toggle="modal" data-target="#logoutModal">
+                                    <i class="fas fa-sign-out-alt fa-sm fa-fw mr-2 text-gray-400"></i>
+                                    Logout
+                                </a>
+                            </div>
+                        </li>
+
+                    </ul>
+
+                </nav>
+                <!-- End of Topbar -->
+
+                <!-- Begin Page Content -->
+                <div class="container-fluid">
+
+    <!-- Month Selection -->
+<form method="post" action="" class="mb-3" style="display: flex; align-items: center;">
+    <label for="month" class="mr-3" style="font-weight: bold; font-size: 20px; margin-right: 10px; color: black;">Select Month:</label>
+    <select name="month" id="month" class="form-control" style="font-size: 15px; width: 200px; color: black;" onchange="this.form.submit()">
+        <?php
+        foreach ($months as $month) {
+            $selected = ($month == $selectedMonth) ? 'selected' : '';
+            echo "<option value='$month' $selected>" . date('F', mktime(0, 0, 0, $month, 1)) . "</option>";
+        }
+        ?>
+    </select>
+</form>
+
+
+
+
+
+    <!-- Content Row -->
+    <div class="row">
+        <div class="col-xl-8 col-lg-7">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary"   align="center" style="font-size: 20px;">Visitor Count for <?php echo date('F', mktime(0, 0, 0, $selectedMonth, 1)); ?></h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-bar">
+                        <canvas id="visitorBarChart"></canvas>
+                    </div>
+                    <hr>
+                </div>
+            </div>
+        </div>
+        <!-- Donut Chart -->
+        <div class="col-xl-4 col-lg-5">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary" align="center" style="font-size: 20px;">TOTAL VISITORS</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-pie pt-4">
+                        <canvas id="myPieChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    <a class="scroll-to-top rounded" href="#page-top">
+        <i class="fas fa-angle-up"></i>
+    </a>
+
+    <!-- Logout Modal-->
+    <div class="modal fade" id="logoutModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="exampleModalLabel">Ready to Leave?</h5>
+                    <button class="close" type="button" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">×</span>
+                    </button>
+                </div>
+                <div class="modal-body">Select "Logout" below if you are ready to end your current session.</div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" type="button" data-dismiss="modal">Cancel</button>
+                    <a class="btn btn-primary" href="login.html">Logout</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="vendor/jquery/jquery.min.js"></script>
+    <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+
+    <script src="vendor/jquery-easing/jquery.easing.min.js"></script>
+
+    <script src="js/sb-admin-2.min.js"></script>
+    <script src="vendor/chart.js/Chart.min.js"></script>
+
+    <script src="js/demo/chart-area-demo.js"></script>
+    <script src="js/demo/chart-pie-demo.js"></script>
+    <script src="js/demo/chart-bar-demo.js"></script>
+    <script>
+var departments = <?php echo json_encode($departments); ?>;
+var visitorCounts = <?php echo json_encode($visitorCounts); ?>;
+
+// Define the color mapping for each department
+var departmentColors = {
+    'OSA': 'rgba(255, 0, 0, 0.6)', // Red
+    'Registrar': 'rgba(0, 128, 0, 0.6)', // Green
+    'College of Technology and Engineering': 'rgba(255, 165, 0, 0.6)', // Orange
+    'College of Business Administration': 'rgba(255, 255, 0, 0.6)' // Yellow
+};
+
+// Generate colors for the departments in the chart
+var backgroundColors = departments.map(function(department) {
+    return departmentColors[department] || 'rgba(54, 162, 235, 0.2)'; // Default to blue if department not mapped
+});
+
+// Get context for the bar chart
+var ctx = document.getElementById('visitorBarChart').getContext('2d');
+
+// Create the bar chart
+var chart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: departments,
+        datasets: [{
+            label: 'Visitor Count',
+            data: visitorCounts,
+            backgroundColor: backgroundColors,
+            borderColor: backgroundColors.map(color => color.replace('0.6', '1')), // Set border color to fully opaque
+            borderWidth: 1
+        }]
+    },
+    options: {
+        plugins: {
+            title: {
+                display: true,
+                text: 'Visitor Count by Department',
+                font: {
+                    size: 18,
+                    weight: 'bold'
+                },
+                padding: {
+                    top: 10,
+                    bottom: 30
+                }
+            },
+            legend: {
+                display: false // Hide legend since each bar is self-explanatory
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return `Department: ${context.label}\nVisitors: ${context.raw}`;
+                    }
+                },
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                titleFont: { size: 14, weight: 'bold' },
+                bodyFont: { size: 12 }
+            }
+        },
+        scales: {
+            x: {
+                title: {
+                    display: true,
+                    text: 'Departments',
+                    font: {
+                        size: 14,
+                        weight: 'bold'
+                    },
+                    color: '#666'
+                },
+                ticks: {
+                    color: '#333',
+                    font: {
+                        size: 12
+                    }
+                }
+            },
+            y: {
+                title: {
+                    display: true,
+                    text: 'Visitor Count',
+                    font: {
+                        size: 14,
+                        weight: 'bold'
+                    },
+                    color: '#666'
+                },
+                ticks: {
+                    stepSize: 1,
+                    color: '#333',
+                    font: {
+                        size: 12
+                    }
+                },
+                grid: {
+                    color: 'rgba(200, 200, 200, 0.3)' // Subtle grid lines
+                }
+            }
+        },
+        responsive: true,
+        maintainAspectRatio: false, // Make the chart flexible to fit different screen sizes
+        animation: {
+            duration: 200, // Smooth animation when loading the chart
+            easing: 'easeInOutBounce' // Easing effect for a polished look
+        },
+        hover: {
+            mode: 'index',
+            intersect: false, // Highlight all bars on the same index
+            animationDuration: 100 // Smooth hover effect
+        }
+    }
+});
+
+    </script>
+    <script>
+// PHP arrays passed to JavaScript
+var departments = <?php echo json_encode($departments); ?>;
+var visitorCounts = <?php echo json_encode($visitorCounts); ?>;
+var totalVisitorCount = <?php echo $totalVisitorCount; ?>;
+
+// Create the donut chart
+var ctx = document.getElementById('myPieChart').getContext('2d');
+var myPieChart = new Chart(ctx, {
+    type: 'doughnut', // Doughnut chart
+    data: {
+        labels: ['Total Visitors', 'Remaining'], // Total visitors and the remaining section
+        datasets: [{
+            data: [totalVisitorCount, 100 - totalVisitorCount], // Total visitors and remaining
+            backgroundColor: ['#36A2EB', '#E9ECEF'], // Blue for total visitors, grey for remaining
+            hoverBackgroundColor: ['#36A2EB', '#E9ECEF']
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: {
+                position: 'top',
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(tooltipItem) {
+                        return tooltipItem.label + ': ' + tooltipItem.raw + ' visitors';
+                    }
+                }
+            }
+        }
+    }
+});
+</script>
+<script>
+    // Generate the color legend dynamically
+    var legendContainer = document.createElement('div');
+    legendContainer.style.display = 'flex';
+    legendContainer.style.flexWrap = 'wrap';
+    legendContainer.style.marginBottom = '20px';
+    legendContainer.style.justifyContent = 'center';
+
+    // Loop through departments and add color indicators
+    departments.forEach(function(department) {
+        var legendItem = document.createElement('div');
+        legendItem.style.display = 'flex';
+        legendItem.style.alignItems = 'center';
+        legendItem.style.margin = '5px';
+
+        var colorBox = document.createElement('div');
+        colorBox.style.width = '20px';
+        colorBox.style.height = '20px';
+        colorBox.style.marginRight = '8px';
+        colorBox.style.backgroundColor = departmentColors[department] || 'rgba(54, 162, 235, 0.2)';
+        colorBox.style.border = '1px solid #333';
+
+        var label = document.createElement('span');
+        label.innerText = department;
+        label.style.fontSize = '14px';
+        label.style.color = '#333';
+
+        legendItem.appendChild(colorBox);
+        legendItem.appendChild(label);
+        legendContainer.appendChild(legendItem);
+    });
+
+    // Append the legend above the chart container
+    var chartContainer = document.querySelector('.chart-bar').parentNode;
+    chartContainer.insertBefore(legendContainer, chartContainer.firstChild);
+</script>
+
+
+</body>
+
+</html>
+
+feedback:
+
+<?php
+session_start();
+if (!isset($_SESSION['username'])) {
+    header("Location: login.html");
+    exit;
+}
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Visitor Information</title>
+    <!-- SB Admin 2 CSS -->
+     <link href="vendor/fontawesome-free/css/all.min.css" rel="stylesheet" type="text/css">
+    <link
+        href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i"
+        rel="stylesheet">
+        <link href="https://cdn.jsdelivr.net/npm/startbootstrap-sb-admin-2@4.1.3/css/sb-admin-2.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/startbootstrap-sb-admin-2@4.1.3/js/sb-admin-2.min.js"></script>
+
+    <!-- Custom styles for this template-->
+    <link href="css/sb-admin-2.min.css" rel="stylesheet">
+    <link rel="stylesheet" type="text/css" href="css/style5.css">
+
+</head>
+
+<body id="page-top">
+
+    <!-- Page Wrapper -->
+    <div id="wrapper">
+
+        <!-- Sidebar -->
+        <ul class="navbar-nav bg-gradient-primary sidebar sidebar-dark accordion" id="accordionSidebar">
+
+            <!-- Sidebar - Brand -->
+            <a class="sidebar-brand d-flex align-items-center justify-content-center" href="index.html">
+                <div class="sidebar-brand-icon rotate-n-15">
+                    <i class="fas fa-laugh-wink"></i>
+                </div>
+                <div class="sidebar-brand-text mx-3">System</div>
+            </a>
+
+            <!-- Divider -->
+            <hr class="sidebar-divider my-0">
+
+            <!-- Nav Item - Dashboard -->
+            <li class="nav-item active">
+                <a class="nav-link" href="index1.php">
+                    <i class="fas fa-fw fa-tachometer-alt"></i>
+                    <span>Dashboard</span></a>
+            </li>
+            <!-- Divider -->
+            <hr class="sidebar-divider">
+
+            <li class="nav-item">
+                <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseTwo"
+                    aria-expanded="true" aria-controls="collapseTwo">
+                    <i class="fas fa-fw fa-table"></i>
+                    <span>Feedback Informations</span>
+                </a>
+                <div id="collapseTwo" class="collapse" aria-labelledby="headingTwo" data-parent="#accordionSidebar">
+                    <div class="bg-white py-2 collapse-inner rounded">
+                        <h6 class="collapse-header">Data:</h6>
+                        <a class="collapse-item" href="">Informations of Visitor</a>
+                        <a class="collapse-item" href="feedbacks.php">Feedbacks of Visitor</a>
+                        <a class="collapse-item" href="suggestion.php">Suggestions of Visitor</a>
+                    </div>
+                </div>
+            </li>
+
+
+            <!-- Divider -->
+            <hr class="sidebar-divider">
+
+            <li class="nav-item">
+                <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseUtilities"
+                    aria-expanded="true" aria-controls="collapseUtilities">
+                    <i class="fas fa-fw fa-chart-area"></i>
+                    <span>Charts</span>
+                </a>
+                <div id="collapseUtilities" class="collapse" aria-labelledby="headingUtilities"
+                    data-parent="#accordionSidebar">
+                    <div class="bg-white py-2 collapse-inner rounded">
+                        <h6 class="collapse-header">Analytics:</h6>
+                        <a class="collapse-item" href="charts.php">Visitor Charts</a>
+                        <a class="collapse-item" href="visitor.php">Feedback Charts</a>
+                    </div>
+                </div>
+            </li>
+
+
+            <!-- Sidebar Toggler (Sidebar) -->
+            <div class="text-center d-none d-md-inline">
+                <button class="rounded-circle border-0" id="sidebarToggle"></button>
+            </div>
+            
+
+        </ul>
+        <!-- End of Sidebar -->
+
+        <!-- Content Wrapper -->
+        <div id="content-wrapper" class="d-flex flex-column">
+
+            <!-- Main Content -->
+            <div id="content">
+
+                <!-- Topbar -->
+                <nav class="navbar navbar-expand navbar-light bg-white topbar mb-4 static-top shadow">
+
+                    <!-- Sidebar Toggle (Topbar) -->
+                    <button id="sidebarToggleTop" class="btn btn-link d-md-none rounded-circle mr-3">
+                        <i class="fa fa-bars"></i>
+                    </button>
+
+
+
+                    <!-- Topbar Navbar -->
+                    <ul class="navbar-nav ml-auto">
+
+                        <!-- Nav Item - Search Dropdown (Visible Only XS) -->
+                        <li class="nav-item dropdown no-arrow d-sm-none">
+                            <a class="nav-link dropdown-toggle" href="#" id="searchDropdown" role="button"
+                                data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                <i class="fas fa-search fa-fw"></i>
+                            </a>
+                            <!-- Dropdown - Messages -->
+                            <div class="dropdown-menu dropdown-menu-right p-3 shadow animated--grow-in"
+                                aria-labelledby="searchDropdown">
+                                <form class="form-inline mr-auto w-100 navbar-search">
+                                    <div class="input-group">
+                                        <input type="text" class="form-control bg-light border-0 small"
+                                            placeholder="Search for..." aria-label="Search"
+                                            aria-describedby="basic-addon2">
+                                        <div class="input-group-append">
+                                            <button class="btn btn-primary" type="button">
+                                                <i class="fas fa-search fa-sm"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </li>
+
+                       
+
+                        <!-- Nav Item - User Information -->
+                        <li class="nav-item dropdown no-arrow">
+                            <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button"
+                                data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                <span class="mr-2 d-none d-lg-inline text-gray-600 small">Admin</span>
+                                <img class="img-profile rounded-circle" src="img/merlion-logo.png">
+                            </a>
+                            <!-- Dropdown - User Information -->
+                            <div class="dropdown-menu dropdown-menu-right shadow animated--grow-in"
+                                aria-labelledby="userDropdown">
+                                
+                                <a class="dropdown-item" href="#" data-toggle="modal" data-target="#logoutModal">
+                                    <i class="fas fa-sign-out-alt fa-sm fa-fw mr-2 text-gray-400"></i>
+                                    Logout
+                                </a>
+                            </div>
+                        </li>
+
+                    </ul>
+
+                </nav>
+                <!-- End of Topbar -->
+
+                <!-- Visitor Information Section -->
+                <div class="container-fluid">
+<form method="GET" class="mb-3 d-flex justify-content-center">
+    <div class="row align-items-center w-100">
+        <!-- Search by Last Name -->
+        <div class="col-md-4 mb-3" >
+            <label for="searchInput" class="form-label"style=" font-size: 15px; color: black;">Search by Last Name:</label>
+            <input type="text" id="searchInput" name="search" class="form-control" style="font-size: 15px; width: 500px;" 
+                   placeholder="Enter last name" 
+                   value="<?= isset($_GET['search']) ? htmlspecialchars($_GET['search']) : '' ?>">
+        </div>
+
+        <!-- Department Dropdown -->
+        <div class="col-md-4 mb-3">
+            <label for="departmentSelect" class="form-label" style="font-size: 15px; width: 500px; color: black;">Filter by Department:</label>
+            <select name="department" class="form-control" style="font-size: 15px; width: 500px;"onchange="this.form.submit()">
+                    <option value="">All Departments</option>
+                    <option value="Registrar" <?= (isset($_GET['department']) && $_GET['department'] == 'Registrar') ? 'selected' : '' ?>>Registrar</option>
+                    <option value="OSA" <?= (isset($_GET['department']) && $_GET['department'] == 'OSA') ? 'selected' : '' ?>>Office of Student Affairs</option>
+                    <option value="College Of Engineering Technology" <?= (isset($_GET['department']) && $_GET['department'] == 'College Of Engineering Technology') ? 'selected' : '' ?>>College of Engineering Technology</option>
+                    <option value="College Business Administration" <?= (isset($_GET['department']) && $_GET['department'] == 'College Business Administration') ? 'selected' : '' ?>>College of Business Administration</option>
+                </select>
+        </div>
+
+    </div>
+</form>
+
+
+
+</div>
+
+
+                    <!-- Visitor Table -->
+                    <div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h3 class="m-0 font-weight-bold text-primary" align="center" style=" font-size: 20px; color: blue;">VISITOR'S INFORMATION LIST</h3>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table id="visitorTable" class="table table-bordered table-striped">
+                <thead>
+                    <tr>
+                        <th>Last Name</th>
+                        <th>Middle Name</th>
+                        <th>First Name</th>
+                        <th>Department Visted</th>
+                        <th>Email</th>
+                        <th>Time In</th>
+                        <th>Time Out</th>
+                        <th>Duration Time</th>
+                    </tr>
+                </thead>
+                <tbody>
+                     <?php
+$dbhost = "localhost";
+$dbuser = "root";
+$dbpass = "";
+$db = "data";
+$conn = new mysqli($dbhost, $dbuser, $dbpass, $db);
+
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
+
+$selected_department = isset($_GET['department']) ? $_GET['department'] : '';
+$search_query = isset($_GET['search']) ? $_GET['search'] : '';
+
+$sql = "SELECT v.*, f.feedback_date FROM visitor v 
+        LEFT JOIN feedback f ON v.email = f.email 
+        WHERE 1=1"; // Join visitor and feedback tables on email
+
+// If a department is selected, add it to the query
+if ($selected_department) {
+    $sql .= " AND v.department = '$selected_department'";
+}
+
+// If a search query is entered, add it to the query (searching by email or last name)
+if ($search_query) {
+    $search_query = $conn->real_escape_string($search_query);
+    $sql .= " AND (v.email LIKE '%$search_query%' OR v.lname LIKE '%$search_query%')";
+}
+
+$result = $conn->query($sql);
+
+if (!$result) {
+    die("Invalid query: " . $conn->error);
+}
+
+while ($row = $result->fetch_assoc()) {
+    // Create DateTime objects for time_in (from visitor) and feedback_date (from feedback)
+    $time_in = new DateTime($row["time_in"]);
+    $feedback_date = isset($row["feedback_date"]) ? new DateTime($row["feedback_date"]) : null;
+    
+    // If feedback_date is available, calculate the duration
+    if ($feedback_date) {
+        // Calculate the time difference
+        $interval = $time_in->diff($feedback_date);
+        $duration = $interval->format('%h hours, %i minutes'); 
+        $formatted_feedback_date = $feedback_date->format('F d, Y/H:i');
+    } else {
+        // If no feedback_date is available, set default values
+        $duration = "N/A";
+        $formatted_feedback_date = "N/A";
+    }
+
+    // Format time_in for display
+    $formatted_time_in = $time_in->format('F d, Y/H:i');
+
+    // Output the data to the table
+    echo "<tr>
+        <td>" . htmlspecialchars(ucwords($row["lname"]), ENT_QUOTES) . "</td>
+        <td>" . htmlspecialchars(ucwords($row["mname"]), ENT_QUOTES) . "</td>
+        <td>" . htmlspecialchars(ucwords($row["fname"]), ENT_QUOTES) . "</td>
+         <td class='department'>" . htmlspecialchars(ucwords($row["department"]), ENT_QUOTES) . "</td>
+        <td>" . htmlspecialchars(ucwords($row["email"]), ENT_QUOTES) . "</td>
+        <td>" . htmlspecialchars($formatted_time_in, ENT_QUOTES) . "</td>
+        <td>" . htmlspecialchars($formatted_feedback_date, ENT_QUOTES) . "</td>
+        <td>" . $duration . "</td> <!-- Display the duration -->
+    </tr>";
+}
+?>
+
+
+
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+                </div>
+                <!-- End of Visitor Information Section -->
+            </div>
+            <!-- End of Main Content -->
+        </div>
+        <!-- End of Content Wrapper -->
+    </div>
+    <!-- End of Page Wrapper -->
+
+    <div class="modal fade" id="logoutModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="exampleModalLabel">Ready to Leave?</h5>
+                    <button class="close" type="button" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">×</span>
+                    </button>
+                </div>
+                <div class="modal-body">Select "Logout" below if you are ready to end your current session.</div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" type="button" data-dismiss="modal">Cancel</button>
+                    <a class="btn btn-primary" href="login.html">Logout</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- SB Admin 2 JS -->
+    <script src="vendor/jquery/jquery.min.js"></script>
+    <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Core plugin JavaScript-->
+    <script src="vendor/jquery-easing/jquery.easing.min.js"></script>
+
+    <!-- Custom scripts for all pages-->
+    <script src="js/sb-admin-2.min.js"></script>
+
+    <!-- Page level plugins -->
+    <script src="vendor/datatables/jquery.dataTables.min.js"></script>
+    <script src="vendor/datatables/dataTables.bootstrap4.min.js"></script>
+
+    <!-- Page level custom scripts -->
+    <script src="js/demo/datatables-demo.js"></script>
+
+</body>
+
+</html>
+    
+suggestion:
+
+<?php
+session_start();
+if (!isset($_SESSION['username'])) {
+    header("Location: login.html");
+    exit;
+}
+?>
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Visitor Information</title>
+        <link href="vendor/fontawesome-free/css/all.min.css" rel="stylesheet" type="text/css">
+        <link href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i"rel="stylesheet">
+        <link href="https://cdn.jsdelivr.net/npm/startbootstrap-sb-admin-2@4.1.3/css/sb-admin-2.min.css" rel="stylesheet">
+        <script src="https://cdn.jsdelivr.net/npm/startbootstrap-sb-admin-2@4.1.3/js/sb-admin-2.min.js"></script>
+
+        <link href="css/sb-admin-2.min.css" rel="stylesheet">
+        <link rel="stylesheet" type="text/css" href="css/style5.css">
+    </style> 
+
+</head>
+
+<body id="page-top">
+
+    <div id="wrapper">
+
+        <ul class="navbar-nav bg-gradient-primary sidebar sidebar-dark accordion" id="accordionSidebar">
+
+            <a class="sidebar-brand d-flex align-items-center justify-content-center" href="index.html">
+                <div class="sidebar-brand-icon rotate-n-15">
+                    <i class="fas fa-laugh-wink"></i>
+                </div>
+                <div class="sidebar-brand-text mx-3">System</div>
+            </a>
+
+            <hr class="sidebar-divider my-0">
+
+            <li class="nav-item active" >
+                <a class="nav-link" href="index1.php">
+                    <i class="fas fa-fw fa-tachometer-alt"></i>
+                    <span>Dashboard</span></a>
+            </li>
+
+
+            <hr class="sidebar-divider">
+
+            <li class="nav-item">
+                <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseTwo"
+                    aria-expanded="true" aria-controls="collapseTwo">
+                    <i class="fas fa-fw fa-table"></i>
+                    <span>Feedback Informations</span>
+                </a>
+                <div id="collapseTwo" class="collapse" aria-labelledby="headingTwo" data-parent="#accordionSidebar">
+                    <div class="bg-white py-2 collapse-inner rounded">
+                        <h6 class="collapse-header">Data:</h6>
+                        <a class="collapse-item" href="feedback.php">Informations of Visitor</a>
+                        <a class="collapse-item" href="feedbacks.php">Feedbacks of Visitor</a>
+                        <a class="collapse-item" href="">Suggestions of Visitor</a>
+                    </div>
+                </div>
+            </li>
+
+
+
+            <hr class="sidebar-divider">
+
+           <li class="nav-item">
+                <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseUtilities"
+                    aria-expanded="true" aria-controls="collapseUtilities">
+                    <i class="fas fa-fw fa-chart-area"></i>
+                    <span>Charts</span>
+                </a>
+                <div id="collapseUtilities" class="collapse" aria-labelledby="headingUtilities"
+                    data-parent="#accordionSidebar">
+                    <div class="bg-white py-2 collapse-inner rounded">
+                        <h6 class="collapse-header">Analytics:</h6>
+                        <a class="collapse-item" href="charts.php">Visitor Charts</a>
+                        <a class="collapse-item" href="visitor.php">Feedback Charts</a>
+                    </div>
+                </div>
+            </li>
+
+            <div class="text-center d-none d-md-inline">
+                <button class="rounded-circle border-0" id="sidebarToggle"></button>
+            </div>
+
+            
+
+        </ul>
+
+        <div id="content-wrapper" class="d-flex flex-column">
+
+
+            <div id="content">
+
+                <nav class="navbar navbar-expand navbar-light bg-white topbar mb-4 static-top shadow">
+
+
+                    <button id="sidebarToggleTop" class="btn btn-link d-md-none rounded-circle mr-3">
+                        <i class="fa fa-bars"></i>
+                    </button>
+
+                    <ul class="navbar-nav ml-auto">
+
+                        <li class="nav-item dropdown no-arrow">
+                            <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button"
+                                data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                <span class="mr-2 d-none d-lg-inline text-gray-600 small">Admin</span>
+                                <img class="img-profile rounded-circle" src="img/merlion-logo.png">
+                            </a>
+                            <div class="dropdown-menu dropdown-menu-right shadow animated--grow-in"
+                                aria-labelledby="userDropdown">
+                                
+                                <a class="dropdown-item" href="#" data-toggle="modal" data-target="#logoutModal">
+                                    <i class="fas fa-sign-out-alt fa-sm fa-fw mr-2 text-gray-400"></i>
+                                    Logout
+                                </a>
+                            </div>
+                        </li>
+
+                    </ul>
+
+                </nav>
+                <div class="container-fluid">
+
+    <form method="GET" class="mb-3">
+    <div class="row">
+        <div class="col-md-4">
+            <select name="department" style=" font-size: 15px; color: black;" class="form-control" onchange="this.form.submit()">
+                <option value="">All Departments</option>
+                <option value="Registrar" <?= (isset($_GET['department']) && $_GET['department'] == 'Registrar') ? 'selected' : '' ?>>Registrar</option>
+                <option value="OSA" <?= (isset($_GET['department']) && $_GET['department'] == 'OSA') ? 'selected' : '' ?>>Office of Student Affairs</option>
+                <option value="College Of Engineering Technology" <?= (isset($_GET['department']) && $_GET['department'] == 'College Of Engineering Technology') ? 'selected' : '' ?>>College of Engineering Technology</option>
+                <option value="College Business Administration" <?= (isset($_GET['department']) && $_GET['department'] == 'College Business Administration') ? 'selected' : '' ?>>College of Business Administration</option>
+            </select>
+        </div>
+    </div>
+</form>
+
+</div>
+
+
+                    <!-- Visitor Table -->
+                    <div class="card shadow mb-4">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary" align="center" style=" font-size: 20px; color: black;">Visitor's Suggestion List</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                                    <thead>
+                                        <tr>
+                                            <th>Email</th>
+                                            <th>Department</th>
+                                            <th>Suggestion</th>
+                                            <th>Person Visited</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                        <?php
+    $dbhost = "localhost";
+    $dbuser = "root";
+    $dbpass = "";
+    $db = "data";
+    $conn = new mysqli($dbhost, $dbuser, $dbpass, $db);
+
+    if ($conn->connect_error) {
+        die("Connection failed: " . $conn->connect_error);
+    }
+
+    $selected_department = isset($_GET['department']) ? $_GET['department'] : '';
+    $search_query = isset($_GET['search']) ? $_GET['search'] : '';
+
+    $sql = "SELECT * FROM feedback WHERE 1=1";
+    if ($selected_department) {
+        $sql .= " AND department = '$selected_department'";
+    }
+    if ($search_query) {
+        $search_query = $conn->real_escape_string($search_query);
+        $sql .= " AND lname LIKE '%$search_query%'";
+    }
+
+    $result = $conn->query($sql);
+
+    if (!$result) {
+        die("Invalid query: " . $conn->error);
+    }
+
+    while ($row = $result->fetch_assoc()) {
+    echo "<tr>
+        <td>" . htmlspecialchars(strtolower($row["email"]), ENT_QUOTES) . "</td>
+        <td>" . htmlspecialchars(ucwords($row["department"]), ENT_QUOTES) . "</td>
+        <td>" . htmlspecialchars($row["suggestion"], ENT_QUOTES) . "</td>
+        <td>" . htmlspecialchars($row["person"], ENT_QUOTES) . "</td>
+    </tr>";
+}
+
+?>
+
+
+
+                </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- End of Visitor Information Section -->
+            </div>
+            <!-- End of Main Content -->
+        </div>
+        <!-- End of Content Wrapper -->
+    </div>
+    <!-- End of Page Wrapper -->
+
+    <div class="modal fade" id="logoutModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="exampleModalLabel">Ready to Leave?</h5>
+                    <button class="close" type="button" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">×</span>
+                    </button>
+                </div>
+                <div class="modal-body">Select "Logout" below if you are ready to end your current session.</div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" type="button" data-dismiss="modal">Cancel</button>
+                    <a class="btn btn-primary" href="login.html">Logout</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- SB Admin 2 JS -->
+    <script src="vendor/jquery/jquery.min.js"></script>
+    <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Core plugin JavaScript-->
+    <script src="vendor/jquery-easing/jquery.easing.min.js"></script>
+
+    <!-- Custom scripts for all pages-->
+    <script src="js/sb-admin-2.min.js"></script>
+
+    <!-- Page level plugins -->
+    <script src="vendor/datatables/jquery.dataTables.min.js"></script>
+    <script src="vendor/datatables/dataTables.bootstrap4.min.js"></script>
+
+    <!-- Page level custom scripts -->
+    <script src="js/demo/datatables-demo.js"></script>
+
+</body>
+
+</html>
+    
+visitor: 
+
+<?php  
+session_start();
+
+// Database credentials
+$servername = "localhost";
+$username = "root";
+$password = "";
+$dbname = "data";
+
+// Create connection
+$conn = new mysqli($servername, $username, $password, $dbname);
+
+// Check connection
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
+
+// Initialize variables
+$departments = []; 
+$selectedMonth = isset($_POST['month']) ? $_POST['month'] : date('m'); 
+
+// Function to categorize ratings
+function categorizeRating($avg_rating) {
+    if ($avg_rating >= 2) {
+        return "Very Good";
+    } elseif ($avg_rating >= 3) {
+        return "Good";
+    } elseif ($avg_rating >= 4) {
+        return "Not-Good";
+    } else {
+        return "Bad";
+    }
+}
+
+// Prepared statement for department rankings
+$stmt = $conn->prepare("
+    SELECT department, AVG(question1) AS avg_rating
+    FROM feedback
+    WHERE MONTH(feedback_date) = ?
+    GROUP BY department
+    ORDER BY avg_rating DESC;
+");
+$stmt->bind_param("i", $selectedMonth);
+$stmt->execute();
+$result = $stmt->get_result();
+
+// Fetch total feedback count
+$totalFeedbackQuery = "
+    SELECT COUNT(*) AS total_feedback
+    FROM feedback
+    WHERE MONTH(feedback_date) = $selectedMonth;
+";
+$totalResult = $conn->query($totalFeedbackQuery);
+$totalFeedback = ($totalResult->num_rows > 0) ? $totalResult->fetch_assoc()['total_feedback'] : 0;
+
+if ($result->num_rows > 0) {
+    while ($row = $result->fetch_assoc()) {
+        $row['category'] = categorizeRating($row['avg_rating']);
+        $departments[] = $row;
+    }
+}
+
+$conn->close();
+$months = range(1, 12);
+?>
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <title>Visitor Information</title>
+
+    <!-- Custom fonts for this template-->
+     <link href="vendor/fontawesome-free/css/all.min.css" rel="stylesheet" type="text/css">
+    <link
+        href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i"
+        rel="stylesheet">
+        <link href="https://cdn.jsdelivr.net/npm/startbootstrap-sb-admin-2@4.1.3/css/sb-admin-2.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/startbootstrap-sb-admin-2@4.1.3/js/sb-admin-2.min.js"></script>
+
+    <!-- Custom styles for this template-->
+    <link href="css/sb-admin-2.min.css" rel="stylesheet">
+    <link rel="stylesheet" type="text/css" href="css/style4.css">
+</head>
+
+<body id="page-top">
+
+    <div id="wrapper">
+
+        <!-- Sidebar -->
+        <ul class="navbar-nav bg-gradient-primary sidebar sidebar-dark accordion" id="accordionSidebar">
+            <a class="sidebar-brand d-flex align-items-center justify-content-center" href="index.html">
+                <div class="sidebar-brand-icon rotate-n-15">
+                    <i class="fas fa-laugh-wink"></i>
+                </div>
+                <div class="sidebar-brand-text mx-3">System</div>
+            </a>
+            <hr class="sidebar-divider my-0">
+            <li class="nav-item active">
+                <a class="nav-link" href="index1.php">
+                    <i class="fas fa-fw fa-tachometer-alt"></i>
+                    <span>Dashboard</span>
+                </a>
+            </li>
+            <hr class="sidebar-divider">
+            <li class="nav-item">
+                <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseTwo"
+                    aria-expanded="true" aria-controls="collapseTwo">
+                    <i class="fas fa-fw fa-table"></i>
+                    <span>Feedback Informations</span>
+                </a>
+                <div id="collapseTwo" class="collapse" aria-labelledby="headingTwo" data-parent="#accordionSidebar">
+                    <div class="bg-white py-2 collapse-inner rounded">
+                        <h6 class="collapse-header">Data:</h6>
+                        <a class="collapse-item" href="feedback.php">Information of Visitor</a>
+                        <a class="collapse-item" href="feedbacks.php">Feedback of Visitor</a>
+                        <a class="collapse-item" href="suggestion.php">Suggestions of Visitor</a>
+                    </div>
+                </div>
+            </li>
+            <hr class="sidebar-divider">
+            <li class="nav-item">
+                <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseUtilities" aria-expanded="true" aria-controls="collapseUtilities">
+                    <i class="fas fa-fw fa-chart-area"></i>
+                    <span>Charts</span>
+                </a>
+                <div id="collapseUtilities" class="collapse" aria-labelledby="headingUtilities" data-parent="#accordionSidebar">
+                    <div class="bg-white py-2 collapse-inner rounded">
+                        <h6 class="collapse-header">Analytics:</h6>
+                        <a class="collapse-item" href="charts.php">Visitor Charts</a>
+                        <a class="collapse-item" href="#">Feedback Charts</a>
+                    </div>
+                </div>
+            </li>
+            <div class="text-center d-none d-md-inline">
+                <button class="rounded-circle border-0" id="sidebarToggle"></button>
+            </div>
+        </ul>
+
+        <div id="content-wrapper" class="d-flex flex-column">
+            <div id="content">
+                <nav class="navbar navbar-expand navbar-light bg-white topbar mb-4 static-top shadow">
+                    <button id="sidebarToggleTop" class="btn btn-link d-md-none rounded-circle mr-3">
+                        <i class="fa fa-bars"></i>
+                    </button>
+                
+
+                    <ul class="navbar-nav ml-auto">
+                        <div class="topbar-divider d-none d-sm-block"></div>
+                        <li class="nav-item dropdown no-arrow">
+                            <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                <span class="mr-2 d-none d-lg-inline text-gray-600 small">Admin</span>
+                                <img class="img-profile rounded-circle" src="img/merlion-logo.png">
+                            </a>
+                            <div class="dropdown-menu dropdown-menu-right shadow animated--grow-in" aria-labelledby="userDropdown">
+                                <div class="dropdown-divider"></div>
+                                <a class="dropdown-item" href="#" data-toggle="modal" data-target="#logoutModal">
+                                    <i class="fas fa-sign-out-alt fa-sm fa-fw mr-2 text-gray-400"></i> Logout
+                                </a>
+                            </div>
+                        </li>
+                    </ul>
+
+                </nav>
+
+                <div class="container-fluid">
+
+    
+
+    <!-- Month Selection -->
+<form method="post" action="" class="mb-3" style="display: flex; align-items: center;">
+    <label for="month" class="mr-3" style="font-weight: bold; font-size: 20px; margin-right: 10px; color: black;">Select Month:</label>
+    <select name="month" id="month" class="form-control" style="font-size: 15px; width: 200px; color: black;" onchange="this.form.submit()">
+        <?php
+        foreach ($months as $month) {
+            $selected = ($month == $selectedMonth) ? 'selected' : '';
+            echo "<option value='$month' $selected>" . date('F', mktime(0, 0, 0, $month, 1)) . "</option>";
+        }
+        ?>
+    </select>
+</form>
+
+                    <div class="row">
+                        <div class="col-xl-8 col-lg-7">
+                            <div class="card shadow mb-4">
+                                <div class="card-header py-3">
+                                    <h6 class="m-0 font-weight-bold text-primary"align="center" style="font-size: 20px;">RESULT OF FEEDBACKS</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-bar">
+                                        <canvas id="rankingChart"></canvas>
+                                    </div>
+                                    <hr>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-xl-4 col-lg-5">
+                            <div class="card shadow mb-4">
+                                <div class="card-header py-3">
+                                    <h6 class="m-0 font-weight-bold text-primary" align="center" style="font-size: 20px;">TOTAL VISITOR'S COUNT</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-pie pt-4">
+                                        <canvas id="myPieChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+        <div class="modal fade" id="logoutModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="exampleModalLabel">Ready to Leave?</h5>
+                    <button class="close" type="button" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">×</span>
+                    </button>
+                </div>
+                <div class="modal-body">Select "Logout" below if you are ready to end your current session.</div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" type="button" data-dismiss="modal">Cancel</button>
+                    <a class="btn btn-primary" href="login.html">Logout</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scroll to Top Button-->
+    <a class="scroll-to-top rounded" href="#page-top">
+        <i class="fas fa-angle-up"></i>
+    </a>
+
+    <script src="vendor/jquery/jquery.min.js"></script>
+    <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="vendor/chart.js/Chart.min.js"></script>
+    <script src="js/sb-admin-2.min.js"></script>
+
+    <script>
+// Prepare the data from PHP
+var departments = <?php echo json_encode(array_column($departments, 'department')); ?>;
+var ratings = <?php echo json_encode(array_column($departments, 'avg_rating')); ?>;
+
+// Define the color mapping for each department (similar to your visitor chart)
+var departmentColors = {
+    'OSA': 'rgba(255, 0, 0, 0.6)', // Red
+    'Registrar': 'rgba(0, 128, 0, 0.6)', // Green
+    'College of Technology and Engineering': 'rgba(255, 165, 0, 0.6)', // Orange
+    'College of Business Administration': 'rgba(255, 255, 0, 0.6)' // Yellow
+};
+
+// Generate colors for the departments in the chart
+var backgroundColors = departments.map(function(department) {
+    return departmentColors[department] || 'rgba(54, 162, 235, 0.6)'; // Default to blue if department not mapped
+});
+
+// Function to categorize ratings into words
+function getRatingCategory(rating) {
+    if (rating >= 2) return "Very Good";
+    if (rating >= 3) return "Good";
+    if (rating >= 4) return "Not Good";
+    return "Bad";
+}
+
+// Categorize each department's rating
+var ratingCategories = ratings.map(function(rating) {
+    return getRatingCategory(rating);
+});
+
+// Create the bar chart
+var ctx = document.getElementById('rankingChart').getContext('2d');
+var rankingChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: departments,  
+        datasets: [{
+            label: 'Average Rating',
+            data: ratings,  
+            backgroundColor: backgroundColors, 
+            borderColor: backgroundColors.map(color => color.replace('0.6', '1')), // Set border color to fully opaque
+            borderWidth: 1
+        }]
+    },
+    options: {
+        plugins: {
+            title: {
+                display: true,
+                text: 'Average Rating by Department',
+                font: {
+                    size: 18,
+                    weight: 'bold'
+                },
+                padding: {
+                    top: 10,
+                    bottom: 30
+                }
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        var ratingCategory = ratingCategories[context.dataIndex]; // Get the rating category for the current department
+                        return `Department: ${context.label}\nRating: ${context.raw} (${ratingCategory})`;
+                    }
+                },
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                titleFont: { size: 14, weight: 'bold' },
+                bodyFont: { size: 12 }
+            }
+        },
+        scales: {
+            x: {
+                title: {
+                    display: true,
+                    text: 'Departments',
+                    font: {
+                        size: 14,
+                        weight: 'bold'
+                    },
+                    color: '#666'
+                },
+                ticks: {
+                    color: '#333',
+                    font: {
+                        size: 12
+                    }
+                }
+            },
+            y: {
+                title: {
+                    display: true,
+                    text: 'Average Rating',
+                    font: {
+                        size: 14,
+                        weight: 'bold'
+                    },
+                    color: '#666'
+                },
+                ticks: {
+                    stepSize: 1,
+                    color: '#333',
+                    font: {
+                        size: 12
+                    },
+                    max: 5 // Ensure the ratings scale goes up to 5
+                },
+                grid: {
+                    color: 'rgba(200, 200, 200, 0.3)' // Subtle grid lines
+                }
+            }
+        },
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: {
+            duration: 200,
+            easing: 'easeInOutBounce'
+        },
+        hover: {
+            mode: 'index',
+            intersect: false,
+            animationDuration: 100
+        }
+    }
+});
+
+// Prepare the data for the doughnut chart (total feedback count)
+var totalFeedback = <?php echo json_encode($totalFeedback); ?>; // Total feedback count
+
+// Prepare the data for the doughnut chart (feedback distribution by category)
+var categories = <?php echo json_encode(array_column($departments, 'category')); ?>;
+var categoryCounts = {
+    "Very Good": 0,
+    "Good": 0,
+    "Not Good": 0,
+    "Bad": 0
+};
+
+// Count the categories (now using words instead of numeric values)
+categories.forEach(function(category) {
+    if (categoryCounts[category] !== undefined) {
+        categoryCounts[category]++;
+    }
+});
+
+
+// Create the feedback count doughnut chart
+var ctx2 = document.getElementById('myPieChart').getContext('2d');
+var myPieChart = new Chart(ctx2, {
+    type: 'doughnut',
+    data: {
+        labels: ['Total Feedbacks', 'Remaining Feedbacks'],  // Categories for doughnut chart
+        datasets: [{
+            label: 'Total Feedback Distribution',
+            data: [totalFeedback, 100 - totalFeedback],  // Using total feedback and the remaining percentage
+            backgroundColor: ['rgba(54, 162, 235, 0.6)', 'rgba(201, 203, 207, 0.6)'],  
+            borderColor: ['rgba(54, 162, 235, 1)', 'rgba(201, 203, 207, 1)'],  
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: {
+                position: 'top',
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(tooltipItem) {
+                        return tooltipItem.label + ': ' + tooltipItem.raw + ' Feedbacks';
+                    }
+                }
+            }
+        }
+    }
+});
+
+</script>
+
+</body>
+
+</html>
